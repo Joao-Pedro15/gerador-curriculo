@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { ResumeFormData, ExperienceEntry, EducationEntry } from './types/resume';
+import { ResumeFormData, ExperienceEntry, EducationEntry, CourseEntry } from './types/resume';
 
 const EMPTY_EXPERIENCE: ExperienceEntry = {
   company: '',
   role: '',
   period: '',
   description: '',
+  techStack: '',
 };
 
 const EMPTY_EDUCATION: EducationEntry = {
@@ -14,85 +15,78 @@ const EMPTY_EDUCATION: EducationEntry = {
   period: '',
 };
 
+const EMPTY_COURSE: CourseEntry = {
+  name: '',
+  institution: '',
+};
+
 const INITIAL_FORM: ResumeFormData = {
   name: '',
   title: '',
   email: '',
   phone: '',
   location: '',
+  github: '',
+  linkedin: '',
   summary: '',
   skills: '',
   experience: [{ ...EMPTY_EXPERIENCE }],
   education: [{ ...EMPTY_EDUCATION }],
+  courses: [{ ...EMPTY_COURSE }],
 };
 
-type Status = 'idle' | 'loading' | 'error';
+type Status = 'idle' | 'loading' | 'error' | 'success';
 
 export default function App() {
   const [form, setForm] = useState<ResumeFormData>(INITIAL_FORM);
   const [status, setStatus] = useState<Status>('idle');
   const [errorMsg, setErrorMsg] = useState('');
 
-  // --- Field handlers ---
   function handleField(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   }
 
-  // --- Experience handlers ---
-  function handleExperienceChange(
-    index: number,
-    field: keyof ExperienceEntry,
-    value: string,
-  ) {
-    setForm((prev) => {
-      const updated = prev.experience.map((exp, i) =>
-        i === index ? { ...exp, [field]: value } : exp,
-      );
-      return { ...prev, experience: updated };
-    });
+  // --- Experience ---
+  function handleExperienceChange(index: number, field: keyof ExperienceEntry, value: string) {
+    setForm((prev) => ({
+      ...prev,
+      experience: prev.experience.map((exp, i) => (i === index ? { ...exp, [field]: value } : exp)),
+    }));
   }
-
   function addExperience() {
-    setForm((prev) => ({
-      ...prev,
-      experience: [...prev.experience, { ...EMPTY_EXPERIENCE }],
-    }));
+    setForm((prev) => ({ ...prev, experience: [...prev.experience, { ...EMPTY_EXPERIENCE }] }));
   }
-
   function removeExperience(index: number) {
+    setForm((prev) => ({ ...prev, experience: prev.experience.filter((_, i) => i !== index) }));
+  }
+
+  // --- Education ---
+  function handleEducationChange(index: number, field: keyof EducationEntry, value: string) {
     setForm((prev) => ({
       ...prev,
-      experience: prev.experience.filter((_, i) => i !== index),
+      education: prev.education.map((edu, i) => (i === index ? { ...edu, [field]: value } : edu)),
     }));
   }
-
-  // --- Education handlers ---
-  function handleEducationChange(
-    index: number,
-    field: keyof EducationEntry,
-    value: string,
-  ) {
-    setForm((prev) => {
-      const updated = prev.education.map((edu, i) =>
-        i === index ? { ...edu, [field]: value } : edu,
-      );
-      return { ...prev, education: updated };
-    });
-  }
-
   function addEducation() {
-    setForm((prev) => ({
-      ...prev,
-      education: [...prev.education, { ...EMPTY_EDUCATION }],
-    }));
+    setForm((prev) => ({ ...prev, education: [...prev.education, { ...EMPTY_EDUCATION }] }));
+  }
+  function removeEducation(index: number) {
+    setForm((prev) => ({ ...prev, education: prev.education.filter((_, i) => i !== index) }));
   }
 
-  function removeEducation(index: number) {
+  // --- Courses ---
+  function handleCourseChange(index: number, field: keyof CourseEntry, value: string) {
     setForm((prev) => ({
       ...prev,
-      education: prev.education.filter((_, i) => i !== index),
+      courses: prev.courses.map((c, i) => (i === index ? { ...c, [field]: value } : c)),
     }));
+  }
+  function addCourse() {
+    setForm((prev) => ({ ...prev, courses: [...prev.courses, { ...EMPTY_COURSE }] }));
+  }
+  function removeCourse(index: number) {
+    setForm((prev) => ({ ...prev, courses: prev.courses.filter((_, i) => i !== index) }));
   }
 
   // --- Submit ---
@@ -107,6 +101,8 @@ export default function App() {
       email: form.email,
       phone: form.phone,
       location: form.location,
+      github: form.github,
+      linkedin: form.linkedin,
       summary: form.summary,
       skills: form.skills
         .split('\n')
@@ -114,6 +110,7 @@ export default function App() {
         .filter(Boolean),
       experience: form.experience,
       education: form.education,
+      courses: form.courses.filter((c) => c.name.trim()),
     };
 
     try {
@@ -138,7 +135,8 @@ export default function App() {
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
-      setStatus('idle');
+      setStatus('success');
+      setTimeout(() => setStatus('idle'), 3000);
     } catch (err) {
       setStatus('error');
       setErrorMsg(err instanceof Error ? err.message : 'Erro inesperado');
@@ -146,230 +144,285 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-950 text-slate-100">
       {/* Header */}
-      <header className="bg-brand-navy text-white py-6 shadow-lg">
-        <div className="max-w-3xl mx-auto px-4">
-          <h1 className="text-2xl font-bold tracking-wide">Gerador de Currículo</h1>
-          <p className="text-blue-200 text-sm mt-1">
-            Preencha o formulário e baixe seu currículo em PDF
-          </p>
+      <header className="border-b border-slate-800 bg-slate-900 sticky top-0 z-10">
+        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center gap-4">
+          <div className="flex gap-1.5 shrink-0">
+            <span className="w-3 h-3 rounded-full bg-red-500/80" />
+            <span className="w-3 h-3 rounded-full bg-yellow-500/80" />
+            <span className="w-3 h-3 rounded-full bg-green-500/80" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-base font-mono font-bold text-brand-teal truncate">
+              ~/resume-generator
+            </h1>
+            <p className="text-slate-500 text-xs font-mono mt-0.5">
+              Currículo tech em PDF • Preencha e baixe
+            </p>
+          </div>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-8">
-        <form onSubmit={handleSubmit} className="space-y-8">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+        <form onSubmit={handleSubmit} className="space-y-5">
 
-          {/* Informações Pessoais */}
-          <Section title="Informações Pessoais">
+          {/* 01 — Informações Pessoais */}
+          <Section num="01" title="Informações Pessoais">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label="Nome completo *" required>
-                <input
+              <Field label="Nome completo" required>
+                <Input
                   name="name"
                   value={form.name}
                   onChange={handleField}
                   required
-                  placeholder="Ex: João Silva"
-                  className={inputClass}
+                  placeholder="João Pedro Silva"
                 />
               </Field>
               <Field label="Título profissional">
-                <input
+                <Input
                   name="title"
                   value={form.title}
                   onChange={handleField}
-                  placeholder="Ex: Desenvolvedor Backend"
-                  className={inputClass}
+                  placeholder="Desenvolvedor Back-End"
                 />
               </Field>
-              <Field label="E-mail *" required>
-                <input
+              <Field label="E-mail" required>
+                <Input
                   name="email"
                   type="email"
                   value={form.email}
                   onChange={handleField}
                   required
                   placeholder="joao@email.com"
-                  className={inputClass}
+                  mono
                 />
               </Field>
               <Field label="Telefone">
-                <input
+                <Input
                   name="phone"
                   value={form.phone}
                   onChange={handleField}
                   placeholder="+55 11 99999-9999"
-                  className={inputClass}
                 />
               </Field>
-              <Field label="Localização" className="sm:col-span-2">
-                <input
+              <Field label="Localização">
+                <Input
                   name="location"
                   value={form.location}
                   onChange={handleField}
                   placeholder="São Paulo, SP"
-                  className={inputClass}
+                />
+              </Field>
+              <Field label="GitHub">
+                <Input
+                  name="github"
+                  value={form.github}
+                  onChange={handleField}
+                  placeholder="github.com/usuario"
+                  mono
+                />
+              </Field>
+              <Field label="LinkedIn" className="sm:col-span-2">
+                <Input
+                  name="linkedin"
+                  value={form.linkedin}
+                  onChange={handleField}
+                  placeholder="linkedin.com/in/usuario"
+                  mono
                 />
               </Field>
             </div>
           </Section>
 
-          {/* Objetivo Profissional */}
-          <Section title="Objetivo Profissional">
-            <Field label="Resumo">
+          {/* 02 — Perfil */}
+          <Section num="02" title="Perfil">
+            <Field label="Resumo profissional">
               <textarea
                 name="summary"
                 value={form.summary}
                 onChange={handleField}
                 rows={4}
-                placeholder="Descreva seu objetivo profissional..."
-                className={inputClass}
+                placeholder="Especialista em desenvolvimento de aplicações..."
+                className={textareaClass}
               />
             </Field>
           </Section>
 
-          {/* Qualificações */}
-          <Section title="Qualificações">
+          {/* 03 — Experiência Profissional */}
+          <Section num="03" title="Experiência Profissional">
+            <div className="space-y-4">
+              {form.experience.map((exp, i) => (
+                <EntryCard
+                  key={i}
+                  index={i}
+                  label="experiência"
+                  onRemove={form.experience.length > 1 ? removeExperience : undefined}
+                >
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Field label="Empresa">
+                      <Input
+                        value={exp.company}
+                        onChange={(e) => handleExperienceChange(i, 'company', e.target.value)}
+                        placeholder="Wake Creators"
+                      />
+                    </Field>
+                    <Field label="Cargo">
+                      <Input
+                        value={exp.role}
+                        onChange={(e) => handleExperienceChange(i, 'role', e.target.value)}
+                        placeholder="Desenvolvedor Backend Pleno"
+                      />
+                    </Field>
+                    <Field label="Período" className="sm:col-span-2">
+                      <Input
+                        value={exp.period}
+                        onChange={(e) => handleExperienceChange(i, 'period', e.target.value)}
+                        placeholder="10/2024 - atualmente"
+                      />
+                    </Field>
+                    <Field label="Atividades (uma por linha)" className="sm:col-span-2">
+                      <textarea
+                        value={exp.description}
+                        onChange={(e) => handleExperienceChange(i, 'description', e.target.value)}
+                        rows={5}
+                        placeholder={
+                          'Implementei serviços de pagamento com integração de PSPs...\nMigração de API legada de HapiJs para NestJs...\nCobertura de 80% de testes unitários com Jest'
+                        }
+                        className={textareaClass}
+                      />
+                    </Field>
+                    <Field label="Tech stack" className="sm:col-span-2">
+                      <Input
+                        value={exp.techStack}
+                        onChange={(e) => handleExperienceChange(i, 'techStack', e.target.value)}
+                        placeholder="TypeScript, NestJs, MongoDB, Docker, GCP"
+                        mono
+                      />
+                    </Field>
+                  </div>
+                </EntryCard>
+              ))}
+              <AddButton onClick={addExperience} label="Adicionar experiência" />
+            </div>
+          </Section>
+
+          {/* 04 — Educação */}
+          <Section num="04" title="Educação">
+            <div className="space-y-4">
+              {form.education.map((edu, i) => (
+                <EntryCard
+                  key={i}
+                  index={i}
+                  label="formação"
+                  onRemove={form.education.length > 1 ? removeEducation : undefined}
+                >
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Field label="Instituição" className="sm:col-span-2">
+                      <Input
+                        value={edu.institution}
+                        onChange={(e) => handleEducationChange(i, 'institution', e.target.value)}
+                        placeholder="Faculdade das Américas (FAM)"
+                      />
+                    </Field>
+                    <Field label="Curso / Grau">
+                      <Input
+                        value={edu.degree}
+                        onChange={(e) => handleEducationChange(i, 'degree', e.target.value)}
+                        placeholder="Análise e desenvolvimento de sistemas"
+                      />
+                    </Field>
+                    <Field label="Período">
+                      <Input
+                        value={edu.period}
+                        onChange={(e) => handleEducationChange(i, 'period', e.target.value)}
+                        placeholder="2023 – em formação"
+                      />
+                    </Field>
+                  </div>
+                </EntryCard>
+              ))}
+              <AddButton onClick={addEducation} label="Adicionar formação" />
+            </div>
+          </Section>
+
+          {/* 05 — Cursos Livres */}
+          <Section num="05" title="Cursos Livres">
+            <div className="space-y-4">
+              {form.courses.map((course, i) => (
+                <EntryCard
+                  key={i}
+                  index={i}
+                  label="curso"
+                  onRemove={form.courses.length > 1 ? removeCourse : undefined}
+                >
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Field label="Nome do curso" className="sm:col-span-2">
+                      <Input
+                        value={course.name}
+                        onChange={(e) => handleCourseChange(i, 'name', e.target.value)}
+                        placeholder="Javascript Expert"
+                      />
+                    </Field>
+                    <Field label="Instituição / Plataforma" className="sm:col-span-2">
+                      <Input
+                        value={course.institution}
+                        onChange={(e) => handleCourseChange(i, 'institution', e.target.value)}
+                        placeholder="Erick Wendel"
+                      />
+                    </Field>
+                  </div>
+                </EntryCard>
+              ))}
+              <AddButton onClick={addCourse} label="Adicionar curso" />
+            </div>
+          </Section>
+
+          {/* 06 — Qualificações */}
+          <Section num="06" title="Qualificações">
             <Field label="Habilidades (uma por linha)">
               <textarea
                 name="skills"
                 value={form.skills}
                 onChange={handleField}
                 rows={5}
-                placeholder={`Node.js\nTypeScript\nDocker\nPostgreSQL`}
-                className={inputClass}
+                placeholder={'Node.js\nTypeScript\nDocker\nPostgreSQL\nKubernetes'}
+                className={`${textareaClass} font-mono`}
               />
             </Field>
           </Section>
 
-          {/* Experiência Profissional */}
-          <Section title="Experiência Profissional">
-            <div className="space-y-4">
-              {form.experience.map((exp, i) => (
-                <div key={i} className="border border-gray-200 rounded-lg p-4 bg-white relative">
-                  {form.experience.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeExperience(i)}
-                      className="absolute top-3 right-3 text-red-400 hover:text-red-600 text-sm font-medium"
-                    >
-                      Remover
-                    </button>
-                  )}
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <Field label="Empresa">
-                      <input
-                        value={exp.company}
-                        onChange={(e) => handleExperienceChange(i, 'company', e.target.value)}
-                        placeholder="TechCorp"
-                        className={inputClass}
-                      />
-                    </Field>
-                    <Field label="Cargo">
-                      <input
-                        value={exp.role}
-                        onChange={(e) => handleExperienceChange(i, 'role', e.target.value)}
-                        placeholder="Backend Engineer"
-                        className={inputClass}
-                      />
-                    </Field>
-                    <Field label="Período" className="sm:col-span-2">
-                      <input
-                        value={exp.period}
-                        onChange={(e) => handleExperienceChange(i, 'period', e.target.value)}
-                        placeholder="2021 - Atual"
-                        className={inputClass}
-                      />
-                    </Field>
-                    <Field label="Descrição das atividades" className="sm:col-span-2">
-                      <textarea
-                        value={exp.description}
-                        onChange={(e) => handleExperienceChange(i, 'description', e.target.value)}
-                        rows={3}
-                        placeholder="Descreva suas principais atividades e conquistas..."
-                        className={inputClass}
-                      />
-                    </Field>
-                  </div>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={addExperience}
-                className={addButtonClass}
-              >
-                + Adicionar experiência
-              </button>
-            </div>
-          </Section>
-
-          {/* Formação Acadêmica */}
-          <Section title="Formação Acadêmica">
-            <div className="space-y-4">
-              {form.education.map((edu, i) => (
-                <div key={i} className="border border-gray-200 rounded-lg p-4 bg-white relative">
-                  {form.education.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeEducation(i)}
-                      className="absolute top-3 right-3 text-red-400 hover:text-red-600 text-sm font-medium"
-                    >
-                      Remover
-                    </button>
-                  )}
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <Field label="Instituição" className="sm:col-span-2">
-                      <input
-                        value={edu.institution}
-                        onChange={(e) => handleEducationChange(i, 'institution', e.target.value)}
-                        placeholder="Universidade de Tecnologia"
-                        className={inputClass}
-                      />
-                    </Field>
-                    <Field label="Curso / Grau">
-                      <input
-                        value={edu.degree}
-                        onChange={(e) => handleEducationChange(i, 'degree', e.target.value)}
-                        placeholder="Bacharel em Ciência da Computação"
-                        className={inputClass}
-                      />
-                    </Field>
-                    <Field label="Período">
-                      <input
-                        value={edu.period}
-                        onChange={(e) => handleEducationChange(i, 'period', e.target.value)}
-                        placeholder="2017 - 2021"
-                        className={inputClass}
-                      />
-                    </Field>
-                  </div>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={addEducation}
-                className={addButtonClass}
-              >
-                + Adicionar formação
-              </button>
-            </div>
-          </Section>
-
-          {/* Error message */}
+          {/* Feedback messages */}
           {status === 'error' && (
-            <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
+            <div className="flex items-center gap-3 bg-red-950/60 border border-red-800/60 text-red-300 rounded-lg px-4 py-3 text-sm font-mono">
+              <span className="text-red-500 shrink-0">✕</span>
               {errorMsg}
+            </div>
+          )}
+          {status === 'success' && (
+            <div className="flex items-center gap-3 bg-emerald-950/60 border border-emerald-800/60 text-emerald-300 rounded-lg px-4 py-3 text-sm font-mono">
+              <span className="text-emerald-500 shrink-0">✓</span>
+              PDF gerado com sucesso! O download iniciou automaticamente.
             </div>
           )}
 
           {/* Submit */}
-          <div className="flex justify-end pt-2">
+          <div className="flex justify-end pt-2 pb-10">
             <button
               type="submit"
               disabled={status === 'loading'}
-              className="bg-brand-navy hover:bg-brand-blue disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold px-8 py-3 rounded-lg transition-colors duration-200 text-base shadow-md"
+              className="bg-brand-teal hover:bg-teal-400 disabled:opacity-50 disabled:cursor-not-allowed text-slate-900 font-mono font-bold px-8 py-3 rounded-lg transition-all duration-200 text-sm shadow-lg shadow-brand-teal/20 flex items-center gap-2"
             >
-              {status === 'loading' ? 'Gerando PDF...' : 'Gerar Currículo'}
+              {status === 'loading' ? (
+                <>
+                  <span className="inline-block animate-spin">◌</span>
+                  gerando pdf...
+                </>
+              ) : (
+                <>
+                  <span>$</span> gerar-curriculo.pdf
+                </>
+              )}
             </button>
           </div>
         </form>
@@ -378,13 +431,22 @@ export default function App() {
   );
 }
 
-// --- Small reusable components ---
+// --- Reusable components ---
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  num,
+  title,
+  children,
+}: {
+  num: string;
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-      <div className="bg-brand-navy px-5 py-3">
-        <h2 className="text-white font-semibold text-sm uppercase tracking-widest">
+    <div className="rounded-xl border border-slate-800 bg-slate-900 overflow-hidden">
+      <div className="border-b border-slate-800 px-5 py-3 flex items-center gap-3">
+        <span className="text-xs font-mono text-slate-600">{num}</span>
+        <h2 className="text-sm font-mono font-bold text-brand-teal tracking-widest uppercase">
           {title}
         </h2>
       </div>
@@ -406,17 +468,72 @@ function Field({
 }) {
   return (
     <div className={className}>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
+      <label className="block text-xs font-mono font-medium text-slate-400 mb-1.5 uppercase tracking-wider">
         {label}
-        {required && <span className="text-red-500 ml-0.5">*</span>}
+        {required && <span className="text-brand-teal ml-1">*</span>}
       </label>
       {children}
     </div>
   );
 }
 
-const inputClass =
-  'w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent transition';
+function Input({
+  mono,
+  ...props
+}: React.InputHTMLAttributes<HTMLInputElement> & { mono?: boolean }) {
+  return (
+    <input
+      {...props}
+      className={`w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal transition ${
+        mono ? 'font-mono' : ''
+      }`}
+    />
+  );
+}
 
-const addButtonClass =
-  'w-full border-2 border-dashed border-brand-blue text-brand-blue rounded-lg py-2.5 text-sm font-medium hover:bg-blue-50 transition-colors duration-150';
+function EntryCard({
+  index,
+  children,
+  onRemove,
+  label,
+}: {
+  index: number;
+  children: React.ReactNode;
+  onRemove?: (index: number) => void;
+  label: string;
+}) {
+  return (
+    <div className="border border-slate-700/60 rounded-lg p-4 bg-slate-800/40">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs font-mono text-slate-500 uppercase tracking-wider">
+          #{String(index + 1).padStart(2, '0')} {label}
+        </span>
+        {onRemove && (
+          <button
+            type="button"
+            onClick={() => onRemove(index)}
+            className="text-xs font-mono text-red-500/70 hover:text-red-400 transition-colors"
+          >
+            remover
+          </button>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function AddButton({ onClick, label }: { onClick: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full border border-dashed border-slate-700 text-slate-500 hover:border-brand-teal hover:text-brand-teal rounded-lg py-2.5 text-sm font-mono transition-colors duration-150"
+    >
+      + {label}
+    </button>
+  );
+}
+
+const textareaClass =
+  'w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal transition resize-none';

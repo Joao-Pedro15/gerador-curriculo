@@ -40,10 +40,13 @@ export async function generateResume(req: Request, res: Response): Promise<void>
     email: req.body.email.trim(),
     phone: req.body.phone?.trim() ?? '',
     location: req.body.location?.trim() ?? '',
+    github: req.body.github?.trim() ?? '',
+    linkedin: req.body.linkedin?.trim() ?? '',
     summary: req.body.summary?.trim() ?? '',
     skills: req.body.skills,
     experience: req.body.experience,
     education: req.body.education,
+    courses: Array.isArray(req.body.courses) ? req.body.courses : [],
   };
 
   try {
