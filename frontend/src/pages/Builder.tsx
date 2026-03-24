@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { ResumeFormData, ExperienceEntry, EducationEntry, CourseEntry } from '../types/resume';
+import ATSAnalyzer from '../components/ATSAnalyzer';
 
 const EMPTY_EXPERIENCE: ExperienceEntry = {
   company: '',
@@ -303,6 +304,9 @@ export default function Builder() {
                 PDF gerado com sucesso! O download iniciou automaticamente.
               </div>
             )}
+
+            {/* ATS Analyzer */}
+            <ATSAnalyzer form={form} />
 
             {/* Submit */}
             <div className="flex justify-end pt-2 pb-10">

@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import resumeRoutes from './routes/resumeRoutes';
+import atsRoutes from './routes/atsRoutes';
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -12,6 +13,7 @@ app.use(cors({
 app.use(express.json({ limit: '1mb' }));
 
 app.use('/api', resumeRoutes);
+app.use('/api', atsRoutes);
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
