@@ -14,6 +14,10 @@ export interface InsightsResult {
 }
 
 export interface InsightsProvider {
+  /** Extrai termos técnicos relevantes da descrição da vaga.
+   *  Se não implementado, o ATSService usa o tokenizador heurístico como fallback. */
+  extractJobKeywords?(jobDescription: string): Promise<string[] | null>;
+
   generateInsights(
     resume: ATSRequest['resume'],
     jobDescription: string,

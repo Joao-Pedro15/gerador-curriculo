@@ -4,6 +4,37 @@ import { InsightsProvider, InsightsResult } from './InsightsProvider';
 
 const MODEL = 'llama-3.1-8b-instant';
 
+const SYSTEM_JSON_ONLY =
+  'Você responde APENAS com JSON válido. Sem texto antes, sem texto depois, sem blocos de código markdown (``` ou `), sem comentários. Apenas o objeto JSON puro.';
+
+/** Remove possíveis envoltórios de markdown (```json ... ```) que o modelo pode gerar */
+function extractJsonRaw(raw: string): string {
+  const match = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (match) return match[1].trim();
+  return raw.trim();
+}
+
+function buildKeywordsPrompt(jobDescription: string): string {
+  return `Extraia SOMENTE os termos técnicos relevantes da descrição de vaga abaixo.
+
+INCLUA: linguagens (Python, JavaScript, TypeScript), frameworks (React, NestJS, Django, Spring), bancos de dados (PostgreSQL, MongoDB, Redis), ferramentas (Docker, Git, Kubernetes, Jenkins), conceitos técnicos (REST API, GraphQL, CI/CD, microsserviços, SOLID, TDD), plataformas (AWS, GCP, Azure), metodologias (Scrum, Agile, Kanban) e nomes específicos de tecnologias.
+
+EXCLUA: qualquer palavra que não seja um termo técnico específico (ex: "experiência", "anos", "empresa", "candidato", "vaga", "equipe").
+
+Formato de saída — exatamente este JSON, nada mais:
+{"keywords": ["Termo1", "Termo2"]}
+
+Regras adicionais:
+- Máximo 30 termos
+- Grafia canônica: "NestJS", "PostgreSQL", "TypeScript", "Node.js", "Vue.js"
+- Sem termos técnicos encontrados → {"keywords": []}
+
+DESCRIÇÃO DA VAGA:
+${jobDescription}
+
+JSON:`;
+}
+
 function buildPrompt(
   resume: ATSRequest['resume'],
   jobDescription: string,
@@ -64,6 +95,31 @@ export class GroqProvider implements InsightsProvider {
     this.client = new Groq({ apiKey });
   }
 
+  async extractJobKeywords(jobDescription: string): Promise<string[] | null> {
+    const prompt = buildKeywordsPrompt(jobDescription);
+
+    try {
+      const completion = await this.client.chat.completions.create({
+        model: MODEL,
+        messages: [
+          { role: 'system', content: SYSTEM_JSON_ONLY },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.1,
+        max_tokens: 256,
+      });
+
+      const raw = extractJsonRaw(completion.choices[0]?.message?.content ?? '');
+      const parsed = JSON.parse(raw) as { keywords?: unknown };
+      if (Array.isArray(parsed.keywords)) {
+        return (parsed.keywords as unknown[]).filter((k): k is string => typeof k === 'string');
+      }
+    } catch (err) {
+      console.error('GroqProvider.extractJobKeywords: failed', err);
+    }
+    return null;
+  }
+
   async generateInsights(
     resume: ATSRequest['resume'],
     jobDescription: string,
@@ -75,18 +131,21 @@ export class GroqProvider implements InsightsProvider {
 
     const completion = await this.client.chat.completions.create({
       model: MODEL,
-      messages: [{ role: 'user', content: prompt }],
+      messages: [
+        { role: 'system', content: SYSTEM_JSON_ONLY },
+        { role: 'user', content: prompt },
+      ],
       temperature: 0.4,
       max_tokens: 512,
     });
 
+    const raw = extractJsonRaw(completion.choices[0]?.message?.content ?? '');
 
-    const raw = completion.choices[0]?.message?.content ?? '';
-
-    console.log({ raw })
+    console.log({ raw, completion })
 
     try {
       const parsed = JSON.parse(raw) as Partial<InsightsResult>;
+      console.log({ parsed })
       return {
         strengths: Array.isArray(parsed.strengths) ? parsed.strengths : [],
         improvements: Array.isArray(parsed.improvements) ? parsed.improvements : [],
