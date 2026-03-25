@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import { analyzeATS } from '../controllers/atsController';
+import { analyzeATSWithAI } from '../controllers/atsAIController';
 
 const router = Router();
 
 router.post('/analyze-ats', analyzeATS);
+router.post('/analyze-ats-ai', analyzeATSWithAI);
 
 export default router;

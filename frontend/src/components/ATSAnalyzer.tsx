@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ResumeFormData } from '../types/resume';
 
-/* ─── Types (espelham backend/src/types/ats.ts) ─── */
+/* ─── Types ─── */
 interface ATSResult {
   score: number;
   level: 'baixo' | 'médio' | 'alto';
@@ -10,6 +10,8 @@ interface ATSResult {
   strengths: string[];
   improvements: string[];
 }
+
+type Mode = 'basic' | 'ai';
 
 /* ─── Score circle SVG ─── */
 function ScoreCircle({ score, level }: { score: number; level: ATSResult['level'] }) {
@@ -48,6 +50,50 @@ function ScoreCircle({ score, level }: { score: number; level: ATSResult['level'
   );
 }
 
+/* ─── Mode selector ─── */
+function ModeSelector({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void }) {
+  return (
+    <div className="flex gap-2">
+      <button
+        type="button"
+        onClick={() => onChange('basic')}
+        className={`flex-1 flex items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-semibold transition-all ${
+          mode === 'basic'
+            ? 'bg-purple-500/15 border-purple-500/50 text-purple-300'
+            : 'border-slate-700 text-slate-500 hover:border-slate-600 hover:text-slate-400'
+        }`}
+      >
+        <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+          />
+        </svg>
+        Análise rápida
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onChange('ai')}
+        className={`flex-1 flex items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-semibold transition-all ${
+          mode === 'ai'
+            ? 'bg-violet-500/15 border-violet-500/50 text-violet-300'
+            : 'border-slate-700 text-slate-500 hover:border-slate-600 hover:text-slate-400'
+        }`}
+      >
+        <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+            d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+          />
+        </svg>
+        Análise com IA
+        <span className="text-[10px] bg-violet-500/20 text-violet-400 border border-violet-500/30 px-1.5 py-0.5 rounded-full leading-none">
+          Groq
+        </span>
+      </button>
+    </div>
+  );
+}
+
 /* ─── Main component ─── */
 interface Props {
   form: ResumeFormData;
@@ -55,9 +101,11 @@ interface Props {
 
 export default function ATSAnalyzer({ form }: Props) {
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<Mode>('basic');
   const [jobDescription, setJobDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ATSResult | null>(null);
+  const [usedMode, setUsedMode] = useState<Mode>('basic');
   const [error, setError] = useState('');
 
   async function handleAnalyze() {
@@ -66,8 +114,10 @@ export default function ATSAnalyzer({ form }: Props) {
     setResult(null);
     setError('');
 
+    const endpoint = mode === 'ai' ? '/api/analyze-ats-ai' : '/api/analyze-ats';
+
     try {
-      const res = await fetch('/api/analyze-ats', {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ resume: form, jobDescription }),
@@ -79,6 +129,7 @@ export default function ATSAnalyzer({ form }: Props) {
       }
 
       const data: ATSResult = await res.json();
+      setUsedMode(mode);
       setResult(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro inesperado');
@@ -129,9 +180,23 @@ export default function ATSAnalyzer({ form }: Props) {
 
       {/* Body */}
       {open && (
-        <div className="border-t border-slate-800 p-5 space-y-5">
+        <div className="border-t border-slate-800 p-5 space-y-4">
           {!result ? (
             <>
+              {/* Mode selector */}
+              <ModeSelector mode={mode} onChange={setMode} />
+
+              {mode === 'ai' && (
+                <div className="flex items-start gap-2 bg-violet-950/30 border border-violet-800/30 rounded-lg px-3 py-2.5 text-xs text-violet-300/80">
+                  <svg className="w-3.5 h-3.5 shrink-0 mt-0.5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  A IA gera insights contextualizados com base no conteúdo real da vaga. Pode levar alguns segundos a mais.
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-mono font-medium text-slate-400 mb-1.5 uppercase tracking-wider">
                   Descrição da vaga
@@ -159,27 +224,39 @@ export default function ATSAnalyzer({ form }: Props) {
                 type="button"
                 onClick={handleAnalyze}
                 disabled={!jobDescription.trim() || loading}
-                className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold px-5 py-2.5 rounded-lg text-sm transition-all"
+                className={`flex items-center gap-2 font-semibold px-5 py-2.5 rounded-lg text-sm transition-all text-white disabled:opacity-40 disabled:cursor-not-allowed ${
+                  mode === 'ai'
+                    ? 'bg-violet-600 hover:bg-violet-500'
+                    : 'bg-purple-600 hover:bg-purple-500'
+                }`}
               >
                 {loading ? (
                   <>
                     <span className="inline-block animate-spin">◌</span>
-                    Analisando...
+                    {mode === 'ai' ? 'Consultando IA...' : 'Analisando...'}
                   </>
                 ) : (
                   <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-                      />
-                    </svg>
-                    Analisar compatibilidade
+                    {mode === 'ai' ? (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                          d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                        />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+                        />
+                      </svg>
+                    )}
+                    {mode === 'ai' ? 'Analisar com IA' : 'Analisar compatibilidade'}
                   </>
                 )}
               </button>
             </>
           ) : (
-            <ResultPanel result={result} onReset={handleReset} />
+            <ResultPanel result={result} usedMode={usedMode} onReset={handleReset} />
           )}
         </div>
       )}
@@ -188,7 +265,7 @@ export default function ATSAnalyzer({ form }: Props) {
 }
 
 /* ─── Result panel ─── */
-function ResultPanel({ result, onReset }: { result: ATSResult; onReset: () => void }) {
+function ResultPanel({ result, usedMode, onReset }: { result: ATSResult; usedMode: Mode; onReset: () => void }) {
   const { score, level, keywordsFound, keywordsMissing, strengths, improvements } = result;
 
   const levelColors = {
@@ -204,7 +281,14 @@ function ResultPanel({ result, onReset }: { result: ATSResult; onReset: () => vo
         <div className="flex flex-col sm:flex-row items-center gap-6">
           <ScoreCircle score={score} level={level} />
           <div className="flex-1 text-center sm:text-left">
-            <h3 className="text-white font-bold text-lg mb-1">Análise de Compatibilidade ATS</h3>
+            <div className="flex items-center gap-2 justify-center sm:justify-start mb-1">
+              <h3 className="text-white font-bold text-lg">Análise de Compatibilidade ATS</h3>
+              {usedMode === 'ai' && (
+                <span className="text-[10px] bg-violet-500/20 text-violet-400 border border-violet-500/30 px-1.5 py-0.5 rounded-full leading-none font-semibold">
+                  IA
+                </span>
+              )}
+            </div>
             <p className="text-slate-400 text-sm leading-relaxed">
               {score >= 65
                 ? 'Seu currículo está bem alinhado com a vaga. Pequenos ajustes podem ainda aumentar o score.'
