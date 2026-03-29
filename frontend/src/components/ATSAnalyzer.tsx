@@ -107,6 +107,8 @@ export default function ATSAnalyzer({ form }: Props) {
   const [result, setResult] = useState<ATSResult | null>(null);
   const [usedMode, setUsedMode] = useState<Mode>('basic');
   const [error, setError] = useState('');
+  const [optimizeLoading, setOptimizeLoading] = useState(false);
+  const [optimizeError, setOptimizeError] = useState('');
 
   async function handleAnalyze() {
     if (!jobDescription.trim()) return;
@@ -138,10 +140,80 @@ export default function ATSAnalyzer({ form }: Props) {
     }
   }
 
+  async function handleOptimize() {
+    if (!result) return;
+    setOptimizeLoading(true);
+    setOptimizeError('');
+
+    try {
+      // Converte ResumeFormData → ResumeData (skills: string → string[])
+      const resumePayload = {
+        name: form.name,
+        title: form.title,
+        email: form.email,
+        phone: form.phone,
+        location: form.location,
+        github: form.github,
+        linkedin: form.linkedin,
+        summary: form.summary,
+        skills: form.skills.split('\n').map((s) => s.trim()).filter(Boolean),
+        experience: form.experience,
+        education: form.education,
+        courses: form.courses.filter((c) => c.name.trim()),
+      };
+
+      // 1. Otimiza o currículo com base nos insights
+      const optimizeRes = await fetch('/api/optimize-resume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          resume: resumePayload,
+          jobDescription,
+          insights: result,
+        }),
+      });
+
+      if (!optimizeRes.ok) {
+        const err = await optimizeRes.json().catch(() => ({ error: 'Erro desconhecido' }));
+        throw new Error(err.error ?? 'Erro ao otimizar currículo');
+      }
+
+      const optimizedResume = await optimizeRes.json();
+
+      // 2. Gera o PDF com o currículo otimizado
+      const pdfRes = await fetch('/api/generate-resume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(optimizedResume),
+      });
+
+      if (!pdfRes.ok) {
+        const err = await pdfRes.json().catch(() => ({ error: 'Erro desconhecido' }));
+        throw new Error(err.error ?? 'Erro ao gerar PDF');
+      }
+
+      const blob = await pdfRes.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const filename = `curriculo-otimizado-${form.name.toLowerCase().replace(/\s+/g, '-')}.pdf`;
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setOptimizeError(err instanceof Error ? err.message : 'Erro inesperado');
+    } finally {
+      setOptimizeLoading(false);
+    }
+  }
+
   function handleReset() {
     setResult(null);
     setJobDescription('');
     setError('');
+    setOptimizeError('');
   }
 
   return (
@@ -256,7 +328,14 @@ export default function ATSAnalyzer({ form }: Props) {
               </button>
             </>
           ) : (
-            <ResultPanel result={result} usedMode={usedMode} onReset={handleReset} />
+            <ResultPanel
+              result={result}
+              usedMode={usedMode}
+              onReset={handleReset}
+              onOptimize={handleOptimize}
+              optimizeLoading={optimizeLoading}
+              optimizeError={optimizeError}
+            />
           )}
         </div>
       )}
@@ -265,7 +344,16 @@ export default function ATSAnalyzer({ form }: Props) {
 }
 
 /* ─── Result panel ─── */
-function ResultPanel({ result, usedMode, onReset }: { result: ATSResult; usedMode: Mode; onReset: () => void }) {
+interface ResultPanelProps {
+  result: ATSResult;
+  usedMode: Mode;
+  onReset: () => void;
+  onOptimize: () => void;
+  optimizeLoading: boolean;
+  optimizeError: string;
+}
+
+function ResultPanel({ result, usedMode, onReset, onOptimize, optimizeLoading, optimizeError }: ResultPanelProps) {
   const { score, level, keywordsFound, keywordsMissing, strengths, improvements } = result;
 
   const levelColors = {
@@ -382,6 +470,55 @@ function ResultPanel({ result, usedMode, onReset }: { result: ATSResult; usedMod
             ))}
           </ul>
         </div>
+      </div>
+
+      {/* ─── Optimize CTA ─── */}
+      <div className="rounded-xl border border-violet-700/40 bg-violet-950/20 p-5 space-y-3">
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 rounded-lg bg-violet-500/15 border border-violet-500/25 flex items-center justify-center text-violet-400 shrink-0 mt-0.5">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+              />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-violet-200">Gerar currículo ideal para esta vaga</p>
+            <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+              A IA vai adaptar seu resumo profissional, reordenar suas skills e reformular as descrições das experiências com foco no que esta vaga pede — sem inventar nada.
+            </p>
+          </div>
+        </div>
+
+        {optimizeError && (
+          <div className="flex items-center gap-2 bg-red-950/50 border border-red-800/50 text-red-300 rounded-lg px-3 py-2.5 text-xs font-mono">
+            <span className="text-red-500">✕</span>
+            {optimizeError}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={onOptimize}
+          disabled={optimizeLoading}
+          className="w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold px-5 py-3 rounded-lg text-sm transition-all"
+        >
+          {optimizeLoading ? (
+            <>
+              <span className="inline-block animate-spin">◌</span>
+              Gerando currículo otimizado...
+            </>
+          ) : (
+            <>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
+              </svg>
+              Baixar currículo otimizado para a vaga
+            </>
+          )}
+        </button>
       </div>
 
       {/* Reset */}
