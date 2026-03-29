@@ -35,3 +35,9 @@ export interface OptimizeResumeRequest {
   jobDescription: string;
   insights: ATSResult;
 }
+
+/** Payload para geração do currículo ideal (candidato fictício de referência) */
+export interface IdealResumeRequest {
+  jobDescription: string;
+  insights: ATSResult;
+}

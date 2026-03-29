@@ -109,6 +109,8 @@ export default function ATSAnalyzer({ form }: Props) {
   const [error, setError] = useState('');
   const [optimizeLoading, setOptimizeLoading] = useState(false);
   const [optimizeError, setOptimizeError] = useState('');
+  const [idealLoading, setIdealLoading] = useState(false);
+  const [idealError, setIdealError] = useState('');
 
   async function handleAnalyze() {
     if (!jobDescription.trim()) return;
@@ -137,6 +139,39 @@ export default function ATSAnalyzer({ form }: Props) {
       setError(err instanceof Error ? err.message : 'Erro inesperado');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleIdealResume() {
+    if (!result) return;
+    setIdealLoading(true);
+    setIdealError('');
+
+    try {
+      const res = await fetch('/api/ideal-resume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobDescription, insights: result }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Erro desconhecido' }));
+        throw new Error(err.error ?? 'Erro ao gerar currículo ideal');
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'curriculo-ideal-referencia.pdf';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setIdealError(err instanceof Error ? err.message : 'Erro inesperado');
+    } finally {
+      setIdealLoading(false);
     }
   }
 
@@ -214,6 +249,7 @@ export default function ATSAnalyzer({ form }: Props) {
     setJobDescription('');
     setError('');
     setOptimizeError('');
+    setIdealError('');
   }
 
   return (
@@ -335,6 +371,9 @@ export default function ATSAnalyzer({ form }: Props) {
               onOptimize={handleOptimize}
               optimizeLoading={optimizeLoading}
               optimizeError={optimizeError}
+              onIdealResume={handleIdealResume}
+              idealLoading={idealLoading}
+              idealError={idealError}
             />
           )}
         </div>
@@ -351,9 +390,12 @@ interface ResultPanelProps {
   onOptimize: () => void;
   optimizeLoading: boolean;
   optimizeError: string;
+  onIdealResume: () => void;
+  idealLoading: boolean;
+  idealError: string;
 }
 
-function ResultPanel({ result, usedMode, onReset, onOptimize, optimizeLoading, optimizeError }: ResultPanelProps) {
+function ResultPanel({ result, usedMode, onReset, onOptimize, optimizeLoading, optimizeError, onIdealResume, idealLoading, idealError }: ResultPanelProps) {
   const { score, level, keywordsFound, keywordsMissing, strengths, improvements } = result;
 
   const levelColors = {
@@ -516,6 +558,55 @@ function ResultPanel({ result, usedMode, onReset, onOptimize, optimizeLoading, o
                 />
               </svg>
               Baixar currículo otimizado para a vaga
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* ─── Ideal resume CTA ─── */}
+      <div className="rounded-xl border border-amber-700/40 bg-amber-950/20 p-5 space-y-3">
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/25 flex items-center justify-center text-amber-400 shrink-0 mt-0.5">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+              />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-amber-200">Ver o currículo do candidato ideal</p>
+            <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+              A IA monta um currículo fictício de referência com o perfil perfeito para esta vaga — um mapa do que estudar e conquistar para se tornar esse profissional.
+            </p>
+          </div>
+        </div>
+
+        {idealError && (
+          <div className="flex items-center gap-2 bg-red-950/50 border border-red-800/50 text-red-300 rounded-lg px-3 py-2.5 text-xs font-mono">
+            <span className="text-red-500">✕</span>
+            {idealError}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={onIdealResume}
+          disabled={idealLoading}
+          className="w-full flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold px-5 py-3 rounded-lg text-sm transition-all"
+        >
+          {idealLoading ? (
+            <>
+              <span className="inline-block animate-spin">◌</span>
+              Gerando currículo de referência...
+            </>
+          ) : (
+            <>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
+              </svg>
+              Baixar currículo do candidato ideal
             </>
           )}
         </button>
